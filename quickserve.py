@@ -133,6 +133,7 @@ http {{
     server {{
         listen       {INTERFACE}:{PORT};
         server_name  localhost;
+        client_max_body_size 800M;
         root {LOCATION};
         location / {{
             index {INDEX};
