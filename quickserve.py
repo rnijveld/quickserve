@@ -5,9 +5,11 @@ from random import choice
 from string import hexdigits
 from argparse import ArgumentParser
 from shutil import rmtree
+import sys
 
 # Parse arguments
 parser = ArgumentParser(description="Start a quick server for PHP projects with an index file. This uses nginx and php-fpm.")
+parser.add_argument('-d', '--debug', action='store_true', help="Display more information")
 parser.add_argument('-p', '--port', metavar='port', type=int, default=8080, help='Port number (default: 8080)')
 parser.add_argument('-i', '--interface', metavar='address', type=str, default='*', help='Interface to listen to (default: *)')
 parser.add_argument('-r', '--root', metavar='dir', type=str, default=getcwd(), help="Web root directory (default: .)")
@@ -24,10 +26,6 @@ if not path.isabs(args.root):
 # Initialize the options dict
 options = {}
 
-# Paths
-options['NGINX_CMD'] = args.nginx_bin
-options['PHPFPM_CMD'] = args.php_fpm_bin
-
 # Generic config
 options['HANDLERS'] = args.handlers
 options['RESTART_AFTER'] = args.restart_after
@@ -36,6 +34,16 @@ options['INDEX'] = args.index
 options['INTERFACE'] = args.interface
 options['PORT'] = args.port
 options['TMP_DIR'] = '/tmp'
+options['DEBUG'] = args.debug
+
+# Detailed config
+options['MAX_CLIENT_BODY_SIZE'] = '100M'
+options['ERROR_REPORTING'] = 'E_ALL'
+options['DISPLAY_ERRORS'] = 'on'
+
+# Paths
+options['NGINX_CMD'] = args.nginx_bin
+options['PHPFPM_CMD'] = args.php_fpm_bin
 
 # Random file names for this instance
 options['RAND'] = ''.join(choice(hexdigits[:16]) for _ in xrange(6))
@@ -54,6 +62,10 @@ listen = {PHPFPM_SOCKET_FILE}
 pm = static
 pm.max_children = {HANDLERS}
 pm.max_requests = {RESTART_AFTER}
+php_value[upload_max_filesize] = {MAX_CLIENT_BODY_SIZE}
+php_value[post_max_size] = {MAX_CLIENT_BODY_SIZE}
+php_value[error_reporting] = {ERROR_REPORTING}
+php_flag[display_errors] = {DISPLAY_ERRORS}
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
@@ -130,10 +142,10 @@ http {{
     default_type  application/octet-stream;
     sendfile      on;
     keepalive_timeout  65;
+    client_max_body_size {MAX_CLIENT_BODY_SIZE};
     server {{
         listen       {INTERFACE}:{PORT};
         server_name  localhost;
-        client_max_body_size 800M;
         root {LOCATION};
         location / {{
             index {INDEX};
@@ -191,6 +203,7 @@ options['PHPFPM_COMMAND'] = [
 # Nginx command
 options['NGINX_COMMAND'] = [
     options['NGINX_CMD'],
+    '-p', options['TMP_DIR'],
     '-c', options['NGINX_CONFIG_FILE'],
     '-q',
 ]
@@ -199,8 +212,14 @@ options['NGINX_COMMAND'] = [
 try:
     with open('/dev/null', 'w') as devnull:
         print("Using webroot {0}".format(options['LOCATION']))
-        phpfpm = Popen(options['PHPFPM_COMMAND'], stdout=devnull, stderr=devnull)
-        nginx = Popen(options['NGINX_COMMAND'], stdout=devnull, stderr=devnull)
+        if options['DEBUG']:
+            stdoutstream = sys.stdout
+            stderrstream = sys.stderr
+        else:
+            stdoutstream = devnull
+            stderrstream = devnull
+        phpfpm = Popen(options['PHPFPM_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
+        nginx = Popen(options['NGINX_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
         print("Server running on {0}:{1}...".format(options['INTERFACE'], options['PORT']))
 
         phpfpm.wait()
