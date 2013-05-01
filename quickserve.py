@@ -180,6 +180,7 @@ http {{
             fastcgi_param SERVER_NAME       $server_name;
             fastcgi_param REDIRECT_STATUS   200;
             fastcgi_param SCRIPT_FILENAME   $document_root$fastcgi_script_name;
+            fastcgi_param APPLICATION_ENV   development;
         }}
     }}
 }}
