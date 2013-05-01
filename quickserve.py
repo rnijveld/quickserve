@@ -40,6 +40,7 @@ options['DEBUG'] = args.debug
 options['MAX_CLIENT_BODY_SIZE'] = '100M'
 options['ERROR_REPORTING'] = 'E_ALL'
 options['DISPLAY_ERRORS'] = 'on'
+options['DATE_TIMEZONE'] = 'Europe/Amsterdam'
 
 # Paths
 options['NGINX_CMD'] = args.nginx_bin
@@ -66,6 +67,7 @@ php_value[upload_max_filesize] = {MAX_CLIENT_BODY_SIZE}
 php_value[post_max_size] = {MAX_CLIENT_BODY_SIZE}
 php_value[error_reporting] = {ERROR_REPORTING}
 php_flag[display_errors] = {DISPLAY_ERRORS}
+php_value[date.timezone] = {DATE_TIMEZONE}
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
