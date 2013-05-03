@@ -85,7 +85,7 @@ options['NGINX_CONFIG'] = """
 error_log /dev/null crit;
 
 pid {NGINX_PID_FILE};
-worker_processes {HANDLERS};
+worker_processes 2;
 events {{ worker_connections  1024; }}
 daemon off;
 master_process off;
