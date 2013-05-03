@@ -68,6 +68,7 @@ php_value[post_max_size] = {MAX_CLIENT_BODY_SIZE}
 php_value[error_reporting] = {ERROR_REPORTING}
 php_flag[display_errors] = {DISPLAY_ERRORS}
 php_value[date.timezone] = {DATE_TIMEZONE}
+php_flag[short_open_tag] = off
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
