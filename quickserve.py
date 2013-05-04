@@ -69,6 +69,7 @@ php_value[error_reporting] = {ERROR_REPORTING}
 php_flag[display_errors] = {DISPLAY_ERRORS}
 php_value[date.timezone] = {DATE_TIMEZONE}
 php_flag[short_open_tag] = off
+php_value[xdebug.max_nesting_level] = 250
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
