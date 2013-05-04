@@ -70,6 +70,8 @@ php_flag[display_errors] = {DISPLAY_ERRORS}
 php_value[date.timezone] = {DATE_TIMEZONE}
 php_flag[short_open_tag] = off
 php_value[xdebug.max_nesting_level] = 250
+php_flag[xdebug.remote_enable] = on
+php_flag[xdebug.remote_connect_back] = on
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
