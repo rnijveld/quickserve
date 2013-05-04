@@ -12,8 +12,13 @@ parser = ArgumentParser(description="Start a quick server for PHP projects with 
 parser.add_argument('-d', '--debug', action='store_true', help="Display more information")
 parser.add_argument('-p', '--port', metavar='port', type=int, default=8080, help='Port number (default: 8080)')
 parser.add_argument('-i', '--interface', metavar='address', type=str, default='*', help='Interface to listen to (default: *)')
-parser.add_argument('-r', '--root', metavar='dir', type=str, default=getcwd(), help="Web root directory (default: .)")
-parser.add_argument('--handlers', metavar='n', type=int, default=6, help="Number of handlers for requests (default: 6)")
+
+rootgroup = parser.add_mutually_exclusive_group()
+rootgroup.add_argument('-r', '--root', metavar='dir', type=str, default=getcwd(), help="Web root directory (default: .)")
+rootgroup.add_argument('-b', '--base-index', action='store_true', help="Assume the directory the index file is in is the webroot")
+
+parser.add_argument('--handlers', metavar='n', type=int, default=6, help="Number of PHP handlers (default: 6)")
+parser.add_argument('--workers', metavar='n', type=int, default=2, help="Number of nginx workers (default: 2)")
 parser.add_argument('--restart-after', metavar='n', type=int, default=0, help="Restart php-fpm processes after this amount of requests, 0 means no restarts (default: 0)")
 parser.add_argument('--php-fpm-bin', metavar='path', type=str, default='php-fpm', help="Location of php-fpm binary (will search path if required) (default: php-fpm)")
 parser.add_argument('--nginx-bin', metavar='path', type=str, default='nginx', help="Location of nginx binary (will search path if required) (defaults: nginx)")
@@ -28,9 +33,20 @@ options = {}
 
 # Generic config
 options['HANDLERS'] = args.handlers
+options['WORKERS'] = args.workers
 options['RESTART_AFTER'] = args.restart_after
-options['LOCATION'] = args.root
-options['INDEX'] = args.index
+if args.base_index:
+    root, indexfile = path.split(args.index)
+    if root == '':
+        root = getcwd()
+
+    if not path.isabs(root):
+        root = path.abspath(root)
+    options['LOCATION'] = root
+    options['INDEX'] = indexfile
+else:
+    options['LOCATION'] = args.root
+    options['INDEX'] = args.index
 options['INTERFACE'] = args.interface
 options['PORT'] = args.port
 options['TMP_DIR'] = '/tmp'
@@ -88,7 +104,7 @@ options['NGINX_CONFIG'] = """
 error_log /dev/null crit;
 
 pid {NGINX_PID_FILE};
-worker_processes 2;
+worker_processes {WORKERS};
 events {{ worker_connections  1024; }}
 daemon off;
 master_process off;
