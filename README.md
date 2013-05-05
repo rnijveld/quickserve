@@ -42,6 +42,9 @@ quickserve.py app.php
 # Change the root folder to public and use index.php (default) as the index
 quickserve.py -r ./public
 
+# Determine the root and index by giving a path
+quickserve.py -b ~/development/website/public/app.php
+
 # Change the port and interface (only allow from localhost on port 1234)
 quickserve.py -i 127.0.0.1 -p 1234
 
