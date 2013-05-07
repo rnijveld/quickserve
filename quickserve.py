@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from subprocess import Popen
-from os import path, mkdir, getcwd, remove
+from os import path, mkdir, getcwd, remove, getenv
+from getpass import getuser
 from random import choice
 from string import hexdigits
 from argparse import ArgumentParser
@@ -62,6 +63,16 @@ options['DATE_TIMEZONE'] = 'Europe/Amsterdam'
 options['NGINX_CMD'] = args.nginx_bin
 options['PHPFPM_CMD'] = args.php_fpm_bin
 
+# Username
+if getuser() == 'root':
+    if getenv('SUDO_USER') != None:
+        user = getenv('SUDO_USER')
+    else:
+        user = 'root'
+    options['USER'] = 'user = {0}'.format(user)
+else:
+    options['USER'] = ''
+
 # Random file names for this instance
 options['RAND'] = ''.join(choice(hexdigits[:16]) for _ in xrange(6))
 
@@ -75,6 +86,7 @@ error_log=/dev/null
 daemonize=no
 
 [www]
+{USER}
 listen = {PHPFPM_SOCKET_FILE}
 pm = static
 pm.max_children = {HANDLERS}
@@ -234,7 +246,7 @@ options['NGINX_COMMAND'] = [
 # Let's get going
 try:
     with open('/dev/null', 'w') as devnull:
-        print("Using webroot {0}".format(options['LOCATION']))
+        print("Serving {0} ({1})".format(options['LOCATION'], options['INDEX']))
         if options['DEBUG']:
             stdoutstream = sys.stdout
             stderrstream = sys.stderr
