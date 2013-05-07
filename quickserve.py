@@ -65,12 +65,12 @@ options['PHPFPM_CMD'] = args.php_fpm_bin
 
 # Username
 if getuser() == 'root':
-    if getenv('SUDO_USER') != None:
-        user = getenv('SUDO_USER')
-    else:
-        user = 'root'
-    options['USER'] = 'user = {0}'.format(user)
+    options['NGINX_USER'] = getuser()
+    options['PHP_USER'] = getenv('SUDO_USER')
+    options['USER'] = 'user = {0}'.format(options['PHP_USER'])
 else:
+    options['NGINX_USER'] = getuser()
+    options['PHP_USER'] = getuser()
     options['USER'] = ''
 
 # Random file names for this instance
@@ -247,6 +247,8 @@ options['NGINX_COMMAND'] = [
 try:
     with open('/dev/null', 'w') as devnull:
         print("Serving {0} ({1})".format(options['LOCATION'], options['INDEX']))
+        if getenv('SUDO_USER') != None:
+            print("Nginx user: {0}; PHP user: {1}".format(options['NGINX_USER'], options['PHP_USER']))
         if options['DEBUG']:
             stdoutstream = sys.stdout
             stderrstream = sys.stderr
