@@ -191,12 +191,10 @@ http {{
         index {INDEX};
 
         location / {{
-            try_files $uri @rewriteapp;
+            try_files $uri $uri/ /{INDEX};
         }}
-        location @rewriteapp {{
-            rewrite ^(.*)$ /{INDEX}/$1 last;
-        }}
-        location ~ ^/(.*?)\.php(/|$) {{
+
+        location ~ \.php$ {{
             fastcgi_pass      unix:/{PHPFPM_SOCKET_FILE};
             fastcgi_keep_conn on;
             fastcgi_split_path_info ^(.+\.php)(/.*)$;
