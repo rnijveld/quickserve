@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from subprocess import Popen
+from subprocess import Popen, PIPE
+from threading import Thread
 from os import path, mkdir, getcwd, remove, getenv
 from getpass import getuser
 from random import choice
@@ -10,9 +11,10 @@ import sys
 
 # Parse arguments
 parser = ArgumentParser(description="Start a quick server for PHP projects with an index file. This uses nginx and php-fpm.")
-parser.add_argument('-d', '--debug', action='store_true', help="Display more information")
+parser.add_argument('-v', '--verbose', action='store_true', help="Display output from php-fpm and nginx")
 parser.add_argument('-p', '--port', metavar='port', type=int, default=8080, help='Port number (default: 8080)')
 parser.add_argument('-i', '--interface', metavar='address', type=str, default='*', help='Interface to listen to (default: *)')
+parser.add_argument('-l', '--log', action='store_true', help="If set, show error log output")
 
 rootgroup = parser.add_mutually_exclusive_group()
 rootgroup.add_argument('-r', '--root', metavar='dir', type=str, default=getcwd(), help="Web root directory (default: .)")
@@ -51,7 +53,8 @@ else:
 options['INTERFACE'] = args.interface
 options['PORT'] = args.port
 options['TMP_DIR'] = '/tmp'
-options['DEBUG'] = args.debug
+options['DEBUG'] = args.verbose
+options['SHOW_LOGS'] = args.log
 
 # Detailed config
 options['MAX_CLIENT_BODY_SIZE'] = '100M'
@@ -80,9 +83,10 @@ options['RAND'] = ''.join(choice(hexdigits[:16]) for _ in xrange(6))
 options['PHPFPM_SOCKET_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-' + options['RAND'] + '.socket')
 options['PHPFPM_CONFIG_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-config-' + options['RAND'] + '.ini')
 options['PHPFPM_PID_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-pid-' + options['RAND'] + '.pid')
+options['PHPFPM_ERROR_LOG'] = path.join(options['TMP_DIR'], 'php-fpm-error-' + options['RAND'] + '.log')
 options['PHPFPM_CONFIG'] = """
 [global]
-error_log=/dev/null
+error_log={PHPFPM_ERROR_LOG}
 daemonize=no
 
 [www]
@@ -100,6 +104,8 @@ php_flag[short_open_tag] = off
 php_value[xdebug.max_nesting_level] = 250
 php_flag[xdebug.remote_enable] = on
 php_flag[xdebug.remote_connect_back] = on
+php_admin_value[error_log] = {PHPFPM_ERROR_LOG}
+php_admin_flag[log_errors] = on
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
@@ -107,13 +113,14 @@ options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 options['NGINX_CONFIG_FILE'] = path.join(options['TMP_DIR'], 'nginx-' + options['RAND'] + '.conf')
 options['NGINX_PID_FILE'] = path.join(options['TMP_DIR'], 'nginx-pid-' + options['RAND'] + '.pid')
 options['NGINX_TMP_DIR'] = path.join(options['TMP_DIR'], 'nginx-tmp-' + options['RAND'])
+options['NGINX_ERROR_LOG'] = path.join(options['TMP_DIR'], 'nginx-error-' + options['RAND'] + '.log')
 options['NGINX_CLIENT_TMP'] = path.join(options['NGINX_TMP_DIR'], 'client_temp')
 options['NGINX_PROXY_TMP'] = path.join(options['NGINX_TMP_DIR'], 'proxy_temp')
 options['NGINX_FASTCGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'fastcgi_temp')
 options['NGINX_UWSGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'uwsgi_temp')
 options['NGINX_SCGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'scgi_temp')
 options['NGINX_CONFIG'] = """
-error_log /dev/null crit;
+error_log {NGINX_ERROR_LOG} warn;
 
 pid {NGINX_PID_FILE};
 worker_processes {WORKERS};
@@ -181,8 +188,9 @@ http {{
         listen       {INTERFACE}:{PORT};
         server_name  localhost;
         root {LOCATION};
+        index {INDEX};
+
         location / {{
-            index {INDEX};
             try_files $uri @rewriteapp;
         }}
         location @rewriteapp {{
@@ -228,6 +236,10 @@ with open(options['NGINX_CONFIG_FILE'], 'w') as f:
 with open(options['PHPFPM_CONFIG_FILE'], 'w') as f:
     f.write(options['PHPFPM_CONFIG'])
 
+# Create log files
+open(options['PHPFPM_ERROR_LOG'], 'a').close()
+open(options['NGINX_ERROR_LOG'], 'a').close()
+
 # PHP-FPM command
 options['PHPFPM_COMMAND'] = [
     options['PHPFPM_CMD'],
@@ -259,11 +271,30 @@ try:
         nginx = Popen(options['NGINX_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
         print("Server running on {0}:{1}...".format(options['INTERFACE'], options['PORT']))
 
+        if options['SHOW_LOGS']:
+            def enqueue_output(t, out):
+                for line in iter(out.readline, b''):
+                    print '[{0}] {1}'.format(t, line.strip())
+                out.close()
+
+            nginx_tail = Popen(['tail', '-f', options['NGINX_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
+            phpfpm_tail = Popen(['tail', '-f', options['PHPFPM_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
+            thread_nginx_tail = Thread(target=enqueue_output, args=('nginx', nginx_tail.stdout))
+            thread_phpfpm_tail = Thread(target=enqueue_output, args=('php-fpm', phpfpm_tail.stdout))
+            thread_nginx_tail.daemon = True
+            thread_phpfpm_tail.daemon = True
+            thread_nginx_tail.start()
+            thread_phpfpm_tail.start()
+
         phpfpm.wait()
         nginx.terminate()
+        nginx_tail.terminate()
+        phpfpm_tail.terminate()
 except (KeyboardInterrupt, SystemExit):
     phpfpm.terminate()
     nginx.terminate()
     rmtree(options['NGINX_TMP_DIR'])
     remove(options['PHPFPM_CONFIG_FILE'])
     remove(options['NGINX_CONFIG_FILE'])
+    remove(options['NGINX_ERROR_LOG'])
+    remove(options['PHPFPM_ERROR_LOG'])
