@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from subprocess import Popen, PIPE
 from threading import Thread
-from os import path, mkdir, getcwd, remove, getenv
+from os import path, mkdir, getcwd, remove, getenv, environ, pathsep
 from getpass import getuser
 from random import choice
 from string import hexdigits
@@ -17,7 +17,7 @@ parser.add_argument('-i', '--interface', metavar='address', type=str, default='*
 parser.add_argument('-l', '--log', action='store_true', help="If set, show error log output")
 
 rootgroup = parser.add_mutually_exclusive_group()
-rootgroup.add_argument('-r', '--root', metavar='dir', type=str, default=getcwd(), help="Web root directory (default: .)")
+rootgroup.add_argument('-r', '--root', metavar='dir', type=str, help="Web root directory (default: .)")
 rootgroup.add_argument('-b', '--base-index', action='store_true', help="Assume the directory the index file is in is the webroot")
 
 parser.add_argument('--handlers', metavar='n', type=int, default=6, help="Number of PHP handlers (default: 6)")
@@ -25,11 +25,8 @@ parser.add_argument('--workers', metavar='n', type=int, default=2, help="Number 
 parser.add_argument('--restart-after', metavar='n', type=int, default=0, help="Restart php-fpm processes after this amount of requests, 0 means no restarts (default: 0)")
 parser.add_argument('--php-fpm-bin', metavar='path', type=str, default='php-fpm', help="Location of php-fpm binary (will search path if required) (default: php-fpm)")
 parser.add_argument('--nginx-bin', metavar='path', type=str, default='nginx', help="Location of nginx binary (will search path if required) (defaults: nginx)")
-parser.add_argument('index', metavar='index_file', type=str, default='index.php', nargs='?', help="The root index file (default: index.php)")
+parser.add_argument('index', metavar='index_file', type=str, nargs='?', help="The root index file (default: index.php)")
 args = parser.parse_args()
-
-if not path.isabs(args.root):
-    args.root = path.abspath(args.root)
 
 # Initialize the options dict
 options = {}
@@ -38,9 +35,28 @@ options = {}
 options['HANDLERS'] = args.handlers
 options['WORKERS'] = args.workers
 options['RESTART_AFTER'] = args.restart_after
+
+# Set root to default if it isn't set, and make it an absolute path
+args.root = getcwd() if args.root == None else path.abspath(args.root)
+
+# If we don't have an index specified, try finding one
+if args.index == None:
+    defaults = environ.get('QS_INDEX_PATH')
+    if defaults != None:
+        for option in defaults.split(pathsep):
+            if path.isfile(option):
+                args.base_index = True
+                args.index = option
+                break
+
+    # Still nothing found? Assume the default
+    if args.index == None:
+        args.index = 'index.php'
+
+# Base directory extraction
 if args.base_index:
     root, indexfile = path.split(args.index)
-    if root == '':
+    if root == '' or root == None:
         root = getcwd()
 
     if not path.isabs(root):
@@ -50,6 +66,8 @@ if args.base_index:
 else:
     options['LOCATION'] = args.root
     options['INDEX'] = args.index
+
+# Other options
 options['INTERFACE'] = args.interface
 options['PORT'] = args.port
 options['TMP_DIR'] = '/tmp'
