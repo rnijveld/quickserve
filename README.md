@@ -10,7 +10,7 @@ Quickly serve a PHP project. Do you want a server:
 
 Then this is what you want. This is a quick python script that allows you to
 run a server using nginx and php-fpm in any server. This script will create
-some temporary configuration for nginx and php-pfm and then run these services
+some temporary configuration for nginx and php-fpm and then run these services
 using these configuration files. When you're done developing you just press
 `Ctrl + C` and the script stops the server and removes all temporary files,
 leaving you with a nice and clean filesystem.
