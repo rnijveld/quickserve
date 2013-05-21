@@ -161,6 +161,7 @@ http {{
         image/svg+xml                         svg svgz;
         image/webp                            webp;
         application/x-shockwave-flash         swf;
+        application/pdf                       pdf;
 
         audio/midi                            mid midi kar;
         audio/mpeg                            mp3;
