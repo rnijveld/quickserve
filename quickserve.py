@@ -25,6 +25,7 @@ parser.add_argument('--workers', metavar='n', type=int, default=2, help="Number 
 parser.add_argument('--restart-after', metavar='n', type=int, default=0, help="Restart php-fpm processes after this amount of requests, 0 means no restarts (default: 0)")
 parser.add_argument('--php-fpm-bin', metavar='path', type=str, default='php-fpm', help="Location of php-fpm binary (will search path if required) (default: php-fpm)")
 parser.add_argument('--nginx-bin', metavar='path', type=str, default='nginx', help="Location of nginx binary (will search path if required) (defaults: nginx)")
+parser.add_argument('-n', '--no-php-fpm', action='store_true', help="Disable php-fpm")
 parser.add_argument('index', metavar='index_file', type=str, nargs='?', help="The root index file (default: index.php)")
 args = parser.parse_args()
 
@@ -73,6 +74,7 @@ options['PORT'] = args.port
 options['TMP_DIR'] = '/tmp'
 options['DEBUG'] = args.verbose
 options['SHOW_LOGS'] = args.log
+options['PHP_FPM_ENABLED'] = not args.no_php_fpm
 
 # Detailed config
 options['MAX_CLIENT_BODY_SIZE'] = '100M'
@@ -275,6 +277,8 @@ options['NGINX_COMMAND'] = [
 # Let's get going
 try:
     with open('/dev/null', 'w') as devnull:
+        if not options['PHP_FPM_ENABLED']:
+            print("Note: php-fpm will not be started")
         print("Serving {0} ({1})".format(options['LOCATION'], options['INDEX']))
         if getenv('SUDO_USER') != None:
             print("Nginx user: {0}; PHP user: {1}".format(options['NGINX_USER'], options['PHP_USER']))
@@ -284,7 +288,8 @@ try:
         else:
             stdoutstream = devnull
             stderrstream = devnull
-        phpfpm = Popen(options['PHPFPM_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
+        if options['PHP_FPM_ENABLED']:
+            phpfpm = Popen(options['PHPFPM_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
         nginx = Popen(options['NGINX_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
         print("Server running on {0}:{1}...".format(options['INTERFACE'], options['PORT']))
 
@@ -295,20 +300,31 @@ try:
                 out.close()
 
             nginx_tail = Popen(['tail', '-f', options['NGINX_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
-            phpfpm_tail = Popen(['tail', '-f', options['PHPFPM_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
             thread_nginx_tail = Thread(target=enqueue_output, args=('nginx', nginx_tail.stdout))
-            thread_phpfpm_tail = Thread(target=enqueue_output, args=('php-fpm', phpfpm_tail.stdout))
             thread_nginx_tail.daemon = True
-            thread_phpfpm_tail.daemon = True
-            thread_nginx_tail.start()
             thread_phpfpm_tail.start()
 
-        phpfpm.wait()
-        nginx.terminate()
-        nginx_tail.terminate()
-        phpfpm_tail.terminate()
+            if options['PHP_FPM_ENABLED']:
+                phpfpm_tail = Popen(['tail', '-f', options['PHPFPM_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
+                thread_phpfpm_tail = Thread(target=enqueue_output, args=('php-fpm', phpfpm_tail.stdout))
+                thread_phpfpm_tail.daemon = True
+                thread_nginx_tail.start()
+
+        # Wait for the main command to exit
+        if options['PHP_FPM_ENABLED']:
+            phpfpm.wait()
+            nginx.terminate()
+        else:
+            nginx.wait()
+
+        # Shut down logging
+        if options['SHOW_LOGS']:
+            nginx_tail.terminate()
+            if options['PHP_FPM_ENABLED']:
+                phpfpm_tail.terminate()
 except (KeyboardInterrupt, SystemExit):
-    phpfpm.terminate()
+    if options['PHP_FPM_ENABLED']:
+        phpfpm.terminate()
     nginx.terminate()
     rmtree(options['NGINX_TMP_DIR'])
     remove(options['PHPFPM_CONFIG_FILE'])
