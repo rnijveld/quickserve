@@ -210,7 +210,7 @@ http {{
         index {INDEX};
 
         location / {{
-            try_files $uri $uri/ /{INDEX};
+            try_files $uri $uri/ /{INDEX}?$query_string;
         }}
 
         location ~ \.php$ {{
