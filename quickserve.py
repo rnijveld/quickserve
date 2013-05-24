@@ -302,13 +302,13 @@ try:
             nginx_tail = Popen(['tail', '-f', options['NGINX_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
             thread_nginx_tail = Thread(target=enqueue_output, args=('nginx', nginx_tail.stdout))
             thread_nginx_tail.daemon = True
-            thread_phpfpm_tail.start()
+            thread_nginx_tail.start()
 
             if options['PHP_FPM_ENABLED']:
                 phpfpm_tail = Popen(['tail', '-f', options['PHPFPM_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
                 thread_phpfpm_tail = Thread(target=enqueue_output, args=('php-fpm', phpfpm_tail.stdout))
                 thread_phpfpm_tail.daemon = True
-                thread_nginx_tail.start()
+                thread_phpfpm_tail.start()
 
         # Wait for the main command to exit
         if options['PHP_FPM_ENABLED']:
