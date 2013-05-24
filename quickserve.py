@@ -7,6 +7,7 @@ from random import choice
 from string import hexdigits
 from argparse import ArgumentParser
 from shutil import rmtree
+import atexit
 import sys
 
 # Parse arguments
@@ -290,7 +291,9 @@ try:
             stderrstream = devnull
         if options['PHP_FPM_ENABLED']:
             phpfpm = Popen(options['PHPFPM_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
+            atexit.register(phpfpm.terminate)
         nginx = Popen(options['NGINX_COMMAND'], stdout=stdoutstream, stderr=stderrstream)
+        atexit.register(nginx.terminate)
         print("Server running on {0}:{1}...".format(options['INTERFACE'], options['PORT']))
 
         if options['SHOW_LOGS']:
@@ -300,12 +303,14 @@ try:
                 out.close()
 
             nginx_tail = Popen(['tail', '-f', options['NGINX_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
+            atexit.register(nginx_tail.terminate)
             thread_nginx_tail = Thread(target=enqueue_output, args=('nginx', nginx_tail.stdout))
             thread_nginx_tail.daemon = True
             thread_nginx_tail.start()
 
             if options['PHP_FPM_ENABLED']:
                 phpfpm_tail = Popen(['tail', '-f', options['PHPFPM_ERROR_LOG']], stdout=PIPE, stderr=stderrstream)
+                atexit.register(phpfpm_tail.terminate)
                 thread_phpfpm_tail = Thread(target=enqueue_output, args=('php-fpm', phpfpm_tail.stdout))
                 thread_phpfpm_tail.daemon = True
                 thread_phpfpm_tail.start()
@@ -326,6 +331,13 @@ except (KeyboardInterrupt, SystemExit):
     if options['PHP_FPM_ENABLED']:
         phpfpm.terminate()
     nginx.terminate()
+
+    # Shut down logging
+    if options['SHOW_LOGS']:
+        nginx_tail.terminate()
+        if options['PHP_FPM_ENABLED']:
+            phpfpm_tail.terminate()
+
     rmtree(options['NGINX_TMP_DIR'])
     remove(options['PHPFPM_CONFIG_FILE'])
     remove(options['NGINX_CONFIG_FILE'])
