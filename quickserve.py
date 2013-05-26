@@ -199,7 +199,7 @@ http {{
 
         application/x-font-opentype           otf;
         application/x-font-truetype           ttf;
-        application/x-font-woff               woff;
+        application/font-woff                 woff;
         apllication/vnd.ms-fontobject         eot;
     }}
     default_type  application/octet-stream;
