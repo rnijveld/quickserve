@@ -26,6 +26,8 @@ parser.add_argument('--workers', metavar='n', type=int, default=2, help="Number 
 parser.add_argument('--restart-after', metavar='n', type=int, default=0, help="Restart php-fpm processes after this amount of requests, 0 means no restarts (default: 0)")
 parser.add_argument('--php-fpm-bin', metavar='path', type=str, default='php-fpm', help="Location of php-fpm binary (will search path if required) (default: php-fpm)")
 parser.add_argument('--nginx-bin', metavar='path', type=str, default='nginx', help="Location of nginx binary (will search path if required) (defaults: nginx)")
+parser.add_argument('--nginx-extra-config', metavar='file', type=str, default='.nginx', help="File containing extra nginx directives (default: .nginx)")
+parser.add_argument('--php-fpm-extra-config', metavar='file', type=str, default='.php-fpm', help="File containing extra php-fpm directives (default: .php-fpm)")
 parser.add_argument('-n', '--no-php-fpm', action='store_true', help="Disable php-fpm")
 parser.add_argument('index', metavar='index_file', type=str, nargs='?', help="The root index file (default: index.php)")
 args = parser.parse_args()
@@ -76,6 +78,8 @@ options['TMP_DIR'] = '/tmp'
 options['DEBUG'] = args.verbose
 options['SHOW_LOGS'] = args.log
 options['PHP_FPM_ENABLED'] = not args.no_php_fpm
+options['NGINX_EXTRA_DIRECTIVES_FILE'] = args.nginx_extra_config
+options['PHPFPM_EXTRA_DIRECTIVES_FILE'] = args.php_fpm_extra_config
 
 # Detailed config
 options['MAX_CLIENT_BODY_SIZE'] = '100M'
@@ -105,6 +109,11 @@ options['PHPFPM_SOCKET_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-' + optio
 options['PHPFPM_CONFIG_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-config-' + options['RAND'] + '.ini')
 options['PHPFPM_PID_FILE'] = path.join(options['TMP_DIR'], 'php-fpm-pid-' + options['RAND'] + '.pid')
 options['PHPFPM_ERROR_LOG'] = path.join(options['TMP_DIR'], 'php-fpm-error-' + options['RAND'] + '.log')
+options['PHPFPM_EXTRA_DIRECTIVES'] = ''
+if path.isfile(options['PHPFPM_EXTRA_DIRECTIVES_FILE']):
+    with open(options['PHPFPM_EXTRA_DIRECTIVES_FILE']) as fextrafpm:
+        options['PHPFPM_EXTRA_DIRECTIVES'] = fextrafpm.read()
+
 options['PHPFPM_CONFIG'] = """
 [global]
 error_log={PHPFPM_ERROR_LOG}
@@ -127,6 +136,7 @@ php_flag[xdebug.remote_enable] = on
 php_flag[xdebug.remote_connect_back] = on
 php_admin_value[error_log] = {PHPFPM_ERROR_LOG}
 php_admin_flag[log_errors] = on
+{PHPFPM_EXTRA_DIRECTIVES}
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
 
@@ -140,6 +150,11 @@ options['NGINX_PROXY_TMP'] = path.join(options['NGINX_TMP_DIR'], 'proxy_temp')
 options['NGINX_FASTCGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'fastcgi_temp')
 options['NGINX_UWSGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'uwsgi_temp')
 options['NGINX_SCGI_TMP'] = path.join(options['NGINX_TMP_DIR'], 'scgi_temp')
+options['NGINX_EXTRA_DIRECTIVES'] = ''
+if path.isfile(options['NGINX_EXTRA_DIRECTIVES_FILE']):
+    with open(options['NGINX_EXTRA_DIRECTIVES_FILE']) as fextranginx:
+        options['NGINX_EXTRA_DIRECTIVES'] = fextranginx.read()
+
 options['NGINX_CONFIG'] = """
 error_log {NGINX_ERROR_LOG} warn;
 
@@ -242,6 +257,8 @@ http {{
             fastcgi_param SCRIPT_FILENAME   $document_root$fastcgi_script_name;
             fastcgi_param APPLICATION_ENV   development;
         }}
+
+        {NGINX_EXTRA_DIRECTIVES}
     }}
 }}
 """
