@@ -257,8 +257,8 @@ http {{
             fastcgi_param SCRIPT_FILENAME   $document_root$fastcgi_script_name;
             fastcgi_param APPLICATION_ENV   development;
 
-            fastcgi_buffers 16 16k;
-            fastcgi_buffer_size 32k;
+            fastcgi_buffers 16 32k;
+            fastcgi_buffer_size 128k;
         }}
 
         {NGINX_EXTRA_DIRECTIVES}
