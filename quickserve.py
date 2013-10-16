@@ -136,6 +136,7 @@ php_flag[xdebug.remote_enable] = on
 php_flag[xdebug.remote_connect_back] = on
 php_admin_value[error_log] = {PHPFPM_ERROR_LOG}
 php_admin_flag[log_errors] = on
+php_admin_value[max_input_vars] = 50000
 {PHPFPM_EXTRA_DIRECTIVES}
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
