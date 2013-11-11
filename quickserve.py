@@ -134,9 +134,11 @@ php_flag[short_open_tag] = off
 php_value[xdebug.max_nesting_level] = 250
 php_flag[xdebug.remote_enable] = on
 php_flag[xdebug.remote_connect_back] = on
+php_flag[xdebug.coverage_enable] = off
 php_admin_value[error_log] = {PHPFPM_ERROR_LOG}
 php_admin_flag[log_errors] = on
 php_admin_value[max_input_vars] = 50000
+php_admin_value[realpath_cache_size] = 4096k
 {PHPFPM_EXTRA_DIRECTIVES}
 """
 options['PHPFPM_CONFIG'] = options['PHPFPM_CONFIG'].format(**options)
