@@ -234,7 +234,7 @@ http {{
             try_files $uri $uri/ /{INDEX}?$query_string;
         }}
 
-        location ~ \.php$ {{
+        location ~ \.php {{
             fastcgi_pass      unix:/{PHPFPM_SOCKET_FILE};
             fastcgi_keep_conn on;
             fastcgi_split_path_info ^(.+\.php)(/.*)$;
