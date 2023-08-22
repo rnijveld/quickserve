@@ -31,6 +31,58 @@ you're executing the script under.
   package managers. Just make sure nginx and php-fpm are available on the
   `PATH` and you should be good to go.
 
+## HTTP2 and TLS
+To enable HTTP2 install nginx version 1.9.5 or higher and configure a TLS
+certificate. By default quickserve will look in /usr/local/etc/nginx/ for a
+cert.pem and a cert.key file. Alternatively, you can provide certificate and
+key files using the parameters --nginx-key and --nginx-cert
+
+Use the following command to generate a self-signed certificate for `localhost`:
+
+```sh
+openssl req -x509 -sha256 -newkey rsa:2048 \
+-keyout /usr/local/etc/nginx/cert.key -out /usr/local/etc/nginx/cert.pem \
+-days 1024 -nodes -subj '/CN=localhost'
+
+chmod 0600 /usr/local/etc/nginx/cert.key
+```
+
+If you want to use other (local) domains over HTTP2, generate a certificate
+with multiple (wildcard) domains:
+
+Create a file `openssl.cnf`:
+
+```boilerplate
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = localhost
+
+[v3_req]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+basicConstraints = CA:TRUE
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = *.localhost.dev
+DNS.3 = *.example.dev
+IP.1 = 127.0.0.1
+```
+
+Generate a certificate:
+
+```sh
+openssl req -x509 -sha256 -newkey rsa:2048 \
+-keyout /usr/local/etc/nginx/cert.key \
+-out /usr/local/etc/nginx/cert.pem \
+-days 1024 -nodes -config openssl.cnf
+```
+
 ## Getting started
 Want to get some help? USe `--help` on the script to see what options are
 available. Some examples:

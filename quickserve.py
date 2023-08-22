@@ -17,6 +17,11 @@ parser.add_argument('-p', '--port', metavar='port', type=int, default=8080, help
 parser.add_argument('-i', '--interface', metavar='address', type=str, default='*', help='Interface to listen to (default: *)')
 parser.add_argument('-l', '--log', action='store_true', help="If set, show error log output")
 
+# HTTP2 and TLS settings
+parser.add_argument('-h2', '--http2', action='store_true', help="Enable HTTP2 (and TLS), nginx > 1.9.5 only")
+parser.add_argument('--ssl-certificate', metavar='n', type=str, default='/usr/local/etc/nginx/cert.pem', help='Server certificate file path')
+parser.add_argument('--ssl-key', metavar='n', type=str,  default='/usr/local/etc/nginx/cert.key', help="Server certificate key file path")
+
 rootgroup = parser.add_mutually_exclusive_group()
 rootgroup.add_argument('-r', '--root', metavar='dir', type=str, help="Web root directory (default: .)")
 rootgroup.add_argument('-b', '--base-index', action='store_true', help="Assume the directory the index file is in is the webroot")
@@ -80,6 +85,22 @@ options['SHOW_LOGS'] = args.log
 options['PHP_FPM_ENABLED'] = not args.no_php_fpm
 options['NGINX_EXTRA_DIRECTIVES_FILE'] = args.nginx_extra_config
 options['PHPFPM_EXTRA_DIRECTIVES_FILE'] = args.php_fpm_extra_config
+
+# HTTP2 and TLS
+options['SSL_CERTIFICATE'] = args.ssl_certificate
+options['SSL_CERTIFICATE_KEY'] = args.ssl_key
+if args.http2:
+    options['LISTEN_FLAGS'] = ' ssl http2 default_server'
+    options['SSL_CONFIG'] = '''
+        ssl                        on;
+        ssl_protocols              TLSv1 TLSv1.1 TLSv1.2;
+        ssl_certificate            {SSL_CERTIFICATE};
+        ssl_certificate_key        {SSL_CERTIFICATE_KEY};
+    '''
+    options['SSL_CONFIG'] = options['SSL_CONFIG'].format(**options)
+else:
+    options['LISTEN_FLAGS'] = '';
+    options['SSL_CONFIG'] = ''
 
 # Detailed config
 options['MAX_CLIENT_BODY_SIZE'] = '100M'
@@ -225,10 +246,12 @@ http {{
     keepalive_timeout  65;
     client_max_body_size {MAX_CLIENT_BODY_SIZE};
     server {{
-        listen       {INTERFACE}:{PORT};
+        listen       {INTERFACE}:{PORT}{LISTEN_FLAGS};
         server_name  localhost;
         root {LOCATION};
         index {INDEX};
+
+        {SSL_CONFIG}
 
         location / {{
             try_files $uri $uri/ /{INDEX}?$query_string;
